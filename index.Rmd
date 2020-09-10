@@ -37,8 +37,8 @@ typeof(`[`)
 # First-class functions
 - R functions are objects in their own right
 - No special syntax for defining and naming a function
-- Create a function object using `function` and bind it to a name with `<-`
-- Binding step is not necessary
+- Typically, create a function object using `function` and bind it to a name with `<-`
+  - Binding step is not necessary
 ```{r eval=FALSE}
 lapply(mtcars, function(x) length(unique(x)))
 Filter(function(x) !is.numeric(x), mtcars)
@@ -121,6 +121,7 @@ class: center, middle
 .footnote[Lexical scoping]
 ---
 ## Name masking
+.footnote[Lexical scoping]
 .pull-left[Names defined within the function mask names outside the function 
 ```{r eval=FALSE}
 x <- 10
@@ -151,13 +152,12 @@ y
 
 --
 The same rules apply if a function is defined inside another function. 
---
-  
-.footnote[Lexical scoping]
+
 ---
 #Functions vs variables
-
-When you use a name in a function call, R ignores non-function objects when looking for that value.
+- Since functions are objects, scoping rules also apply to functions
+- What happens if you use the same name for a function and non-function object?
+  - R ignores non-function objects when looking for that value
 
 ```{r eval=FALSE}
 g09 <- function(x) x + 100
@@ -168,13 +168,17 @@ g10 <- function() {
 g10()
 #> [1] 110
 ```
-  
+ 
+ !!! Using same name for different things is a bad idea!!!   
 .footnote[Lexical scoping]
 ???
+g09 takes two different values
 best to not use same names (caution from Hadley) but knowing this can help us troubleshoot
+
 ---
 # A fresh start
-Every time a function is called a new environment is created to host its execution. 
+- Every time a function is called a new environment is created to host its execution. 
+- Each invocation is completely independent
 ```{r eval=FALSE}
 g11 <- function() {
   if (!exists("a")) {
@@ -189,11 +193,11 @@ g11()
 g11()
 ```
 
-Each run is independent of other runs
 
 .footnote[Lexical scoping]
 ---
 #Dynamic Look up
+.footnote[Lexical scoping]
 - R looks for values when the function is run, not when the function is created. 
 
 
@@ -207,13 +211,15 @@ x <- 20
 g12()
 #> [1] 21
 ```
-
+--
 - If there is a a spelling mistake in the code, you won’t get an error message when you create the function
+- Use `codetools` to detect the external dependencies
+--
 ```{r eval=FALSE}
 codetools::findGlobals(g12)
 #> [1] "+" "x"
 ```
-.footnote[Lexical scoping]
+
 ---
 class: middle, center
 # Lazy evaluation
@@ -230,27 +236,38 @@ h01(stop("This is an error!"))
 
 ---
 # Promises
-### Lazy evaluation is powered by Promises : a data structure 
-
+#### Lazy evaluation is powered by "promise": a data structure 
 A promise has three components
-- An expression, like `x + y`, which gives rise to the delayed computation
-- An environment where the expression should be evaluated
-- A value, which is computed and cached the first time a promise is accessed when the expression is evaluated in the specified environment
+- **An expression**, like `x + y`, which gives rise to the delayed computation
+- **An environment** where the expression should be evaluated
+- **A value**, which is computed and cached the first time a promise is accessed when the expression is evaluated in the specified environment
+```{r eval=FALSE}
+double <- function(x) { 
+  message("Calculating...")
+  x * 2
+}
+h03 <- function(x) {
+  c(x, x)
+}
+h03(double(20))
+> Calculating...
+> [1] 40 40
+```
 
 .footnote[Lazy evaluation]
 ---
 # Default arguments
 Default arguments can be defined in terms of
 - other arguments
-- variables defined later in the function
-!!! Not recommended because
-- makes the code harder to understand
-- need to know the exact order of evaluation
+- variables defined later in the function  
+  - !!! Not recommended because
+      - makes the code harder to understand
+      - need to know the exact order of evaluation
 
 .footnote[Lazy evaluation]
 ---
 # Missing arguments
-you can use `missing()` to see if the argument's value comes from the user or defualt
+you can use `missing()` to see if the argument's value comes from the user or default
 ```{r eval=FALSE}
 h06 <- function(x = 10) {
   list(missing(x), x)
@@ -320,10 +337,13 @@ j02 <- function(x) {
 # Invisible values
 - The most common function that returns invisibly is `<-`
 - Can make invisible by applying `invisible()` to the last value
+
+
 ```{r eval=FALSE}
 j04 <- function() invisible(1)
 j04()
 ```
+- Verify if the value exists by using `print()` or wrapping in `()`
 
 ```{r eval=FALSE}
 print(j04())
@@ -401,25 +421,10 @@ for(i in 1:10) print(i)
 # Using prefix form
 - By position, like help(mean).
 - Partial matching, like help(top = mean).
-- By name, like help(topic = mean)
+- By name, like help(topic = mean)  
 !!! Use positional matching only for the first one or two arguments. Avoid using positional matching for less commonly used arguments, and **never use partial matching**.!!!
 
-```{r eval=FALSE}
-add <- function(x, y) x + y
-lapply(list(1:3, 4:5), add, 3)
-> [[1]]
-> [1] 4 5 6
-> [[2]]
-> [1] 7 8
-```
 
-```{r eval=FALSE}
-lapply(list(1:3, 4:5), `+`, 3)
-> [[1]]
-> [1] 4 5 6
-> [[2]]
-> [1] 7 8
-```
 
 .footnote[Function forms]
 ???
@@ -435,6 +440,8 @@ Use positional matching only for the first one or two arguments; they will be th
 #> [1] "new string"
 
 ```
+- names can contain any sequence of characters except `%`
+
 
 .footnote[Function forms]
 
@@ -443,13 +450,20 @@ Use positional matching only for the first one or two arguments; they will be th
 - Functions that replace values by assignment, like `names(df) <- c("a", "b", "c")`
 - They have the special name `xxx<-`, must have arguments named `x` and value, and must return the modified object
 
+```{r eval=FALSE}
+`second<-` <- function(x, value) {
+  x[2] <- value
+  x
+}
+```
+
+
 .footnote[Function forms]
 ---
 # Special forms
 - They don't have a consistent form like `[[`, `if`, and `for`
-- Knowing the name of the function that underlies a special form is useful for getting documentation: 
-  - ?( is a syntax error; ?`(` will give you the documentation for parentheses.
-- All special forms are implemented as primitive functions; this means printing these functions is not informative:
+- Knowing the name of the function that underlies a special form is useful for getting documentation
+- All special forms are implemented as primitive functions; this means printing these functions is not informative
 
 ```{r eval=FALSE}
 `for`
